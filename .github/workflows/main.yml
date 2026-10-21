@@ -1,10 +1,8 @@
 name: RDP
 
-# WARNING: Actions logs of a public repository are visible to everyone. This
-# workflow prints the generated RDP credentials, so public repositories are
-# suitable only for short connectivity tests. Use a private repository for
-# real use, or provide a fixed password via a repository secret and stop
-# printing it.
+# The RDP password comes from the repository secret RDP_PASSWORD and is hidden
+# from logs and summaries. In a public repository the frps address and remote
+# port are still visible; use a private repository for real use.
 
 on:
   workflow_dispatch:
@@ -27,6 +25,8 @@ jobs:
   secure-rdp:
     runs-on: windows-latest
     timeout-minutes: 3600
+    env:
+      RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -38,7 +38,9 @@ jobs:
 
       - name: Create RDP User with Secure Password
         shell: powershell
-        run: .\scripts\New-RdpUser.ps1
+        run: |
+          if (-not $env:RDP_PASSWORD) { throw "Repository secret RDP_PASSWORD is not set." }
+          .\scripts\New-RdpUser.ps1 -Password $env:RDP_PASSWORD -HidePassword
 
       - name: Install frpc (self-hosted frp, no third-party tunnel)
         shell: powershell
@@ -60,13 +62,14 @@ jobs:
             -ServerAddr $env:FRP_SERVER_ADDR `
             -ServerPort $serverPort `
             -RemotePort $remotePort `
-            -FrpcPath $env:FRPC_PATH
+            -FrpcPath $env:FRPC_PATH `
+            -HidePassword
 
       - name: Verify RDP Accessibility
         shell: powershell
-        run: .\scripts\Test-FrpTunnel.ps1
+        run: .\scripts\Test-FrpTunnel.ps1 -HidePassword
 
       - name: Maintain Connection
         if: always()
         shell: powershell
-        run: .\scripts\Watch-FrpTunnel.ps1
+        run: .\scripts\Watch-FrpTunnel.ps1 -HidePassword

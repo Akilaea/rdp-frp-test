@@ -4,7 +4,8 @@ param(
     [int]$Retries = 8,
     [int]$RetryDelaySeconds = 3,
     [int]$TimeoutMs = 5000,
-    [switch]$TcpOnly
+    [switch]$TcpOnly,
+    [switch]$HidePassword
 )
 
 $ErrorActionPreference = "Stop"
@@ -88,4 +89,5 @@ Write-AccessBanner `
     -ServerAddr $state.serverAddr `
     -RemotePort ([int]$state.remotePort) `
     -UserName $userName `
-    -Password $password
+    -Password $password `
+    -HidePassword:$HidePassword

@@ -2,7 +2,8 @@
 param(
     [string]$UserName = "RDP",
     [string]$Password = "",
-    [string]$CredentialFile = ""
+    [string]$CredentialFile = "",
+    [switch]$HidePassword
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,8 +13,13 @@ if (-not (Test-IsAdministrator)) {
     throw "New-RdpUser.ps1 must run as Administrator."
 }
 
+if (-not $Password -and $env:RDP_PASSWORD) {
+    $Password = $env:RDP_PASSWORD
+    Write-Host "[*] Using the fixed password from RDP_PASSWORD."
+}
 if (-not $Password) {
     $Password = New-StrongPassword -Length 16
+    Write-Host "[*] No password supplied; generated a random password."
 }
 
 $securePassword = ConvertTo-SecureString -String $Password -AsPlainText -Force
@@ -92,5 +98,9 @@ Set-GitHubEnvValue -Values @{
 Write-Host ""
 Write-Host "[+] RDP user ready."
 Write-Host "    Username : $UserName"
-Write-Host "    Password : $Password"
+if ($HidePassword) {
+    Write-Host "    Password : ******** (repository secret RDP_PASSWORD)"
+} else {
+    Write-Host "    Password : $Password"
+}
 Write-Host ""

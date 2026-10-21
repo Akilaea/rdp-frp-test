@@ -195,15 +195,19 @@ function Write-AccessBanner {
         [Parameter(Mandatory)][int]$RemotePort,
         [string]$UserName = "RDP",
         [string]$Password = "",
-        [bool]$AddSummary = $true
+        [bool]$AddSummary = $true,
+        [switch]$HidePassword
     )
     $address = "$ServerAddr`:$RemotePort"
+    $passwordDisplay = $Password
+    if ($HidePassword) { $passwordDisplay = "******** (repository secret RDP_PASSWORD)" }
+
     Write-Host ""
     Write-Host "==================================================" -ForegroundColor Green
     Write-Host "  RDP ACCESS (frp)" -ForegroundColor Green
     Write-Host "    Address  : $address"
     Write-Host "    Username : $UserName"
-    Write-Host "    Password : $Password"
+    Write-Host "    Password : $passwordDisplay"
     Write-Host "==================================================" -ForegroundColor Green
     Write-Host ""
 
@@ -215,7 +219,7 @@ function Write-AccessBanner {
 | --- | --- |
 | Address | ``$address`` |
 | Username | ``$UserName`` |
-| Password | ``$Password`` |
+| Password | ``$passwordDisplay`` |
 "@
         Add-GitHubStepSummary -Markdown $summary
     }

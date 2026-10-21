@@ -1,7 +1,8 @@
 name: RDP Test
 
-# Short-lived public test workflow. It publishes the connection info to
-# RDP_INFO.txt so it can be read from the repository while the job is running.
+# Short-lived public test workflow. It publishes the address and username to
+# RDP_INFO.txt; the password comes from the repository secret RDP_PASSWORD and
+# is never written to the repository or the logs.
 
 on:
   workflow_dispatch:
@@ -27,6 +28,8 @@ jobs:
   test-rdp:
     runs-on: windows-latest
     timeout-minutes: 60
+    env:
+      RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -38,7 +41,9 @@ jobs:
 
       - name: Create RDP User with Secure Password
         shell: powershell
-        run: .\scripts\New-RdpUser.ps1
+        run: |
+          if (-not $env:RDP_PASSWORD) { throw "Repository secret RDP_PASSWORD is not set." }
+          .\scripts\New-RdpUser.ps1 -Password $env:RDP_PASSWORD -HidePassword
 
       - name: Install frpc (self-hosted frp)
         shell: powershell
@@ -60,14 +65,15 @@ jobs:
             -ServerAddr $env:FRP_SERVER_ADDR `
             -ServerPort $serverPort `
             -RemotePort $remotePort `
-            -FrpcPath $env:FRPC_PATH
+            -FrpcPath $env:FRPC_PATH `
+            -HidePassword
 
           $state = Get-Content "$env:ProgramData\rdp-frp\state.json" -Raw | ConvertFrom-Json
           $info = @(
             "RDP over frp - test run $env:GITHUB_RUN_ID",
             "Address : $($state.serverAddr):$($state.remotePort)",
             "Username: $($state.userName)",
-            "Password: $($state.password)",
+            "Password: stored in repository secret RDP_PASSWORD",
             "Started : $($state.startedAt)",
             "Run URL : $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
           ) -join "`r`n"
@@ -83,4 +89,4 @@ jobs:
       - name: Maintain Connection
         if: always()
         shell: powershell
-        run: .\scripts\Watch-FrpTunnel.ps1
+        run: .\scripts\Watch-FrpTunnel.ps1 -HidePassword

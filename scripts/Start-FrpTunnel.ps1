@@ -18,6 +18,7 @@ param(
     [int]$VerifyRetries = 4,
     [string]$UserName = "",
     [string]$Password = "",
+    [switch]$HidePassword,
     [string]$StatePath = ""
 )
 
@@ -200,7 +201,7 @@ Set-GitHubEnvValue -Values @{
     RDP_STATE_PATH = $StatePath
 }
 
-Write-AccessBanner -ServerAddr $ServerAddr -RemotePort $selectedPort -UserName $UserName -Password $Password
+Write-AccessBanner -ServerAddr $ServerAddr -RemotePort $selectedPort -UserName $UserName -Password $Password -HidePassword:$HidePassword
 Write-Host "[+] frpc is running (PID $($selectedProcess.Id))."
 Write-Host "    Config : $configPath"
 Write-Host "    Log    : $logPath"

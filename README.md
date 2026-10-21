@@ -12,7 +12,7 @@
 | 原 workflow | 本项目 |
 | --- | --- |
 | 开启 RDP、关闭 NLA、开放 3389 防火墙、重启 TermService | `scripts/Enable-Rdp.ps1` |
-| 创建 `RDP` 用户，生成 16 位随机强密码，加入 Administrators / Remote Desktop Users | `scripts/New-RdpUser.ps1` |
+| 创建 `RDP` 用户，生成 16 位随机强密码，加入 Administrators / Remote Desktop Users | `scripts/New-RdpUser.ps1`（Actions 可用 `RDP_PASSWORD` Secret 固定密码） |
 | 安装 Tailscale | `scripts/Install-Frpc.ps1`（只装 frp 官方客户端） |
 | `tailscale up` 建立隧道 | `scripts/Start-FrpTunnel.ps1`（frpc 连接 47.98.228.129:7000） |
 | `Test-NetConnection` 验证 3389 | `scripts/Test-FrpTunnel.ps1`（TCP + 真实 RDP 握手） |
@@ -23,7 +23,8 @@
 
 ```
 .
-├── .github/workflows/main.yml     # 和参考项目一样的工作流，只是 Tailscale 换成了 frp
+├── .github/workflows/main.yml     # 主工作流（Tailscale 换成 frp）
+├── .github/workflows/rdp-test.yml # 公开测试工作流（地址写入 RDP_INFO.txt，密码来自 Secret）
 ├── scripts/
 │   ├── FrpHelpers.ps1             # 公共函数（随机密码、TOML、TCP/RDP 探测、状态文件）
 │   ├── Enable-Rdp.ps1             # 开启 RDP + 防火墙 + 服务检查
@@ -52,7 +53,7 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 .\scripts\Invoke-RdpFrpSetup.ps1 -UseMirror -Supervise
 ```
 
-脚本会依次：开启 RDP → 创建 `RDP` 用户并生成随机密码 → 下载 frpc → 自动选择一个可用的远程端口 → 建立隧道 → 用真实 RDP 握手验证 → 进入守护循环。屏幕上和 `C:\ProgramData\rdp-frp\state.json` 中都会有访问信息。
+脚本会依次：开启 RDP → 创建 `RDP` 用户（未提供密码时生成随机密码）→ 下载 frpc → 自动选择一个可用的远程端口 → 建立隧道 → 用真实 RDP 握手验证 → 进入守护循环。屏幕上和 `C:\ProgramData\rdp-frp\state.json` 中都会有访问信息。
 
 不要守护循环时去掉 `-Supervise`，frpc 会留在后台继续运行。
 
@@ -70,6 +71,13 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 
 # 自动按 gh-proxy.com -> ghproxy.net -> ghfast.top -> GitHub 顺序尝试下载
 .\scripts\Invoke-RdpFrpSetup.ps1 -UseMirror -Supervise
+
+# 使用固定密码，并在输出中隐藏密码
+$env:RDP_PASSWORD = "你的固定密码"
+.\scripts\Invoke-RdpFrpSetup.ps1 -HidePassword -Supervise
+
+# 也可以直接传 -Password
+.\scripts\Invoke-RdpFrpSetup.ps1 -Password "你的固定密码" -HidePassword -Supervise
 
 # frps 以后加了 token
 .\scripts\Invoke-RdpFrpSetup.ps1 -Token "你的token" -Supervise
@@ -92,7 +100,8 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 | `-MinRemotePort` / `-MaxRemotePort` | `30000` / `49999` | 自动挑选的随机范围 |
 | `-MaxAttempts` | `30` | 自动模式下最多尝试的随机端口数量 |
 | `-UserName` | `RDP` | 本地用户名 |
-| `-Password` | 自动生成 | 指定密码 |
+| `-Password` | 自动生成 | 指定密码；也可通过环境变量 `RDP_PASSWORD` 提供 |
+| `-HidePassword` | 关闭 | 输出中隐藏密码（Actions 工作流使用） |
 | `-Token` | 空 | frps `auth.token` |
 | `-KeepNla` | 关闭 | 保留 NLA（默认按参考项目关闭） |
 | `-FrpZip` | 空 | 使用本地 frp zip |
@@ -107,12 +116,20 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 
 把仓库推到 GitHub，进入 **Actions → RDP → Run workflow**。工作流仍然是 `workflow_dispatch` 手动触发、`windows-latest`、`timeout-minutes: 3600`，但不再安装 Tailscale，而是直接连你的 frps。
 
+运行前先创建一个仓库 Secret：
+
+- **Settings → Secrets and variables → Actions → New repository secret**
+- Name：`RDP_PASSWORD`
+- Value：你的固定密码
+
+工作流会强制检查这个 Secret，缺失时直接失败。密码不会打印到日志或 job summary，脚本以 `-HidePassword` 输出 `********`。另外提供了 `.github/workflows/rdp-test.yml` 测试工作流：它会把地址、用户名写入 `RDP_INFO.txt`，密码同样只来自 Secret。
+
 可选输入：
 
 - `server_port`：frps 控制端口，默认 `7000`
 - `remote_port`：对外端口，默认 `0`（自动）
 
-运行后，在 **Create RDP User**、**Establish frp Tunnel**、**Verify RDP Accessibility** 这几个步骤的日志，以及 job summary 里都能看到地址、用户名和密码。
+运行后，在 **Establish frp Tunnel** 的日志和 job summary 里能看到地址、端口和用户名；密码来自仓库 Secret，不会显示。
 
 ## 连接方式
 
@@ -120,7 +137,7 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 
 - 计算机：`47.98.228.129:<远程端口>`
 - 用户名：`RDP`
-- 密码：脚本输出
+- 密码：仓库 Secret `RDP_PASSWORD`（本地模式则看脚本输出，或用 `-HidePassword` 隐藏）
 
 ## 工作原理
 
@@ -160,11 +177,11 @@ bindPort = 7000
 
 ## 安全说明
 
-> **公开仓库警告**：GitHub Actions 在公开仓库中的运行日志和 job summary 对所有人可见。本工作流会打印 RDP 地址、端口和密码；如果你在公开仓库里运行它，任何能访问该仓库的人都能从日志里拿到凭据并尝试连接。公开仓库只建议做短时间连通性测试，跑完立即取消；真实使用请把仓库设为私有，或改为通过仓库 Secret 提供固定密码并删除日志输出。
+> **公开仓库提示**：地址和端口会出现在公开仓库的日志/`RDP_INFO.txt` 中，但密码来自仓库 Secret，不会打印。公开仓库仍只建议做短时间连通性测试，跑完立即取消；真实使用请把仓库设为私有。
 
 这个项目的效果等同于把一台 Windows 的 RDP 暴露在公网 frps 的某个端口上，请至少注意：
 
-- 脚本生成的是 16 位、包含四类字符的随机密码；`state.json` 只允许 Administrators 和 SYSTEM 读取。
+- GitHub Actions 使用仓库 Secret `RDP_PASSWORD` 作为固定密码，并用 `-HidePassword` 隐藏输出；本地模式未提供密码时生成 16 位随机密码。`state.json` 只允许 Administrators 和 SYSTEM 读取。
 - 默认按参考项目关闭了 NLA（`SecurityLayer=0`、`UserAuthentication=0`）以兼容老客户端；如果客户端支持，建议加 `-KeepNla` 保留 NLA。
 - 你的 frps 没有 token，任何人都能连接控制端口并占用端口。建议后续给 frps 增加 `auth.token`、`allowPorts`，并用云安全组只放行 RDP 用的远程端口。
 - 不需要时及时停止：`Get-Process frpc | Stop-Process -Force`，并可用 `Remove-LocalUser RDP` 删除账号。

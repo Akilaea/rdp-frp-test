@@ -3,7 +3,8 @@ param(
     [string]$StatePath = "",
     [int]$CheckIntervalSeconds = 15,
     [int]$ReportIntervalSeconds = 300,
-    [int]$MaxRestartFailures = 3
+    [int]$MaxRestartFailures = 3,
+    [switch]$HidePassword
 )
 
 $ErrorActionPreference = "Continue"
@@ -103,7 +104,8 @@ while ($true) {
             -RemotePort ([int]$state.remotePort) `
             -UserName $userName `
             -Password $password `
-            -AddSummary $false
+            -AddSummary $false `
+            -HidePassword:$HidePassword
         $lastReport = Get-Date
     }
 

@@ -1,6 +1,4 @@
-﻿RDP over frp - test run 39588853140
-Address : 47.98.228.129:44140
+RDP over frp - test workflow
+Address : (published by the next test run)
 Username: RDP
-Password: w4R(a^J)vM4\7c9X
-Started : 2026-10-21T11:01:54.4828845+00:00
-Run URL : https://github.com/Akilaea/rdp-frp-test/actions/runs/39588853140
+Password: stored in repository secret RDP_PASSWORD

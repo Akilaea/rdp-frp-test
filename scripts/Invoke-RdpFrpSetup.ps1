@@ -21,6 +21,7 @@ param(
     [switch]$SkipVerify,
     [switch]$TcpOnly,
     [switch]$KeepNla,
+    [switch]$HidePassword,
     [switch]$Supervise
 )
 
@@ -29,6 +30,10 @@ $ErrorActionPreference = "Stop"
 
 if (-not (Test-IsAdministrator)) {
     throw "Run this script from an elevated PowerShell (Run as Administrator)."
+}
+
+if (-not $Password -and $env:RDP_PASSWORD) {
+    $Password = $env:RDP_PASSWORD
 }
 
 $credFile = Join-Path $WorkDir "credentials.json"
@@ -40,7 +45,7 @@ if (-not $SkipRdpSetup) {
     & (Join-Path $PSScriptRoot "Enable-Rdp.ps1") -KeepNla:$KeepNla
 
     Write-Step "Step 2/4 - Creating the RDP user"
-    & (Join-Path $PSScriptRoot "New-RdpUser.ps1") -UserName $UserName -Password $Password -CredentialFile $credFile
+    & (Join-Path $PSScriptRoot "New-RdpUser.ps1") -UserName $UserName -Password $Password -CredentialFile $credFile -HidePassword:$HidePassword
 } else {
     Write-Step "Step 1/4 - Reusing the existing RDP configuration"
     if (-not (Test-Path -LiteralPath $credFile)) {
@@ -85,16 +90,17 @@ Write-Step "Step 4/4 - Establishing the frp tunnel"
     -SkipVerify:$SkipVerify `
     -TcpOnly:$TcpOnly `
     -UserName $rdpUser `
-    -Password $rdpPassword
+    -Password $rdpPassword `
+    -HidePassword:$HidePassword
 
 if (-not $SkipVerify) {
     Write-Step "Verifying RDP accessibility"
-    & (Join-Path $PSScriptRoot "Test-FrpTunnel.ps1") -TcpOnly:$TcpOnly
+    & (Join-Path $PSScriptRoot "Test-FrpTunnel.ps1") -TcpOnly:$TcpOnly -HidePassword:$HidePassword
 }
 
 if ($Supervise) {
     Write-Step "Supervising the tunnel (Ctrl+C stops the supervisor, frpc keeps running)"
-    & (Join-Path $PSScriptRoot "Watch-FrpTunnel.ps1")
+    & (Join-Path $PSScriptRoot "Watch-FrpTunnel.ps1") -HidePassword:$HidePassword
 } else {
     Write-Host ""
     Write-Host "[+] Setup complete. frpc keeps running in the background."
