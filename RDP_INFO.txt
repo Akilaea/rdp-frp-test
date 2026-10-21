@@ -1,6 +1,6 @@
-﻿RDP over frp - test run 39591504421
-Address : 47.98.228.129:38033
+﻿RDP over frp - test run 39592022809
+Address : 47.98.228.129:42626
 Username: RDP
 Password: stored in repository secret RDP_PASSWORD
-Started : 2026-10-21T11:23:08.4049323+00:00
-Run URL : https://github.com/Akilaea/rdp-frp-test/actions/runs/39591504421
+Started : 2026-10-21T11:27:25.1235972+00:00
+Run URL : https://github.com/Akilaea/rdp-frp-test/actions/runs/39592022809
