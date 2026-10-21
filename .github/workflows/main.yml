@@ -1,0 +1,71 @@
+name: RDP
+
+# WARNING: Actions logs of a public repository are visible to everyone. This
+# workflow prints the generated RDP credentials, so public repositories are
+# suitable only for short connectivity tests. Use a private repository for
+# real use, or provide a fixed password via a repository secret and stop
+# printing it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_port:
+        description: "frps bindPort (control port)"
+        required: false
+        default: "7000"
+      remote_port:
+        description: "Remote port exposed by frps for RDP (0 = auto)"
+        required: false
+        default: "0"
+
+env:
+  FRP_SERVER_ADDR: "47.98.228.129"
+  INPUT_SERVER_PORT: ${{ inputs.server_port }}
+  INPUT_REMOTE_PORT: ${{ inputs.remote_port }}
+
+jobs:
+  secure-rdp:
+    runs-on: windows-latest
+    timeout-minutes: 3600
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Core RDP Settings
+        shell: powershell
+        run: .\scripts\Enable-Rdp.ps1
+
+      - name: Create RDP User with Secure Password
+        shell: powershell
+        run: .\scripts\New-RdpUser.ps1
+
+      - name: Install frpc (self-hosted frp, no third-party tunnel)
+        shell: powershell
+        run: |
+          . .\scripts\FrpHelpers.ps1
+          $frpc = .\scripts\Install-Frpc.ps1
+          if (-not $frpc) { throw "frpc installation failed" }
+          Set-GitHubEnvValue -Values @{ FRPC_PATH = $frpc }
+
+      - name: Establish frp Tunnel
+        shell: powershell
+        run: |
+          $serverPort = 7000
+          if ($env:INPUT_SERVER_PORT -match '^\d+$') { $serverPort = [int]$env:INPUT_SERVER_PORT }
+          $remotePort = 0
+          if ($env:INPUT_REMOTE_PORT -match '^\d+$') { $remotePort = [int]$env:INPUT_REMOTE_PORT }
+
+          .\scripts\Start-FrpTunnel.ps1 `
+            -ServerAddr $env:FRP_SERVER_ADDR `
+            -ServerPort $serverPort `
+            -RemotePort $remotePort `
+            -FrpcPath $env:FRPC_PATH
+
+      - name: Verify RDP Accessibility
+        shell: powershell
+        run: .\scripts\Test-FrpTunnel.ps1
+
+      - name: Maintain Connection
+        shell: powershell
+        run: .\scripts\Watch-FrpTunnel.ps1
